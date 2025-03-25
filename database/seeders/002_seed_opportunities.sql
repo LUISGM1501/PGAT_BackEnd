@@ -1,0 +1,4 @@
+-- Insertar ofertas de ejemplo
+INSERT INTO ofertas (nombre, tipo, descripcion, vacantes, horas_semana, fecha_inicio, fecha_fin, escuela_id, profesor_id, promedio_minimo, beneficio) VALUES
+('Asistencia de Laboratorio - Programación I', 'Asistencia', 'Se requiere asistente para apoyar en los laboratorios de Programación I. Las actividades incluyen preparación de material, atención a consultas de estudiantes y calificación de ejercicios prácticos.', 2, 8, '2025-04-01', '2025-06-30', 1, 1, 80, 'Exoneración total de matrícula'),
+('Tutoría de Estructuras de Datos', 'Tutoría', 'Se busca estudiante para realizar tutorías de Estructuras de Datos. Debe tener excelente dominio de los temas del curso y disponibilidad para atender consultas.', 1, 4, '2025-04-01', '2025-06-30', 1, 1, 85, 'Pago por horas (₡2,500/hora)');
