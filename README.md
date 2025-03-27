@@ -6,6 +6,26 @@
 
 Este documento detalla los pasos necesarios para configurar el backend del proyecto **PGAT-TEC** utilizando **Node.js** con **TypeScript**.
 
+## Docker
+
+Para configurar una base de datos PostgreSQL utilizando Docker, ejecuta el siguiente comando:
+
+```bash
+docker run --name pgat-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=pgat_tec_db -p 5432:5432 -d postgres:latest
+```
+
+
+Para poner en pausa el contenedor de Docker:
+```bash
+docker stop pgat-postgres
+```
+Para reiniciarlo:
+
+```bash
+docker start pgat-postgres
+```
+
+
 ## 1. Inicializar el proyecto Node.js
 
 Navega a la carpeta donde se encuentra el backend e inicializa un nuevo proyecto Node.js:
@@ -116,16 +136,3 @@ Para ejecutar el proyecto en modo desarrollo, usa el siguiente comando:
 ```bash
 npx nodemon src/server.ts
 ```
-
-En caso de que quieras compilar el código TypeScript a JavaScript:
-
-```bash
-npx tsc
-```
-
-Y luego ejecuta el código compilado:
-
-```bash
-node dist/server.js
-```
-
