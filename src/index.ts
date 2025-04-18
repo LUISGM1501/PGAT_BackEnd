@@ -12,7 +12,7 @@ import ofertaRoutes from './routes/oferta.routes';
 import usuarioRoutes from './routes/usuario.routes';
 import projectRoutes from './routes/project.routes';
 import profesorRoutes from './routes/profesor.routes';
-import adminRoutes from './routes/admin.routes'; // Nueva ruta de administrador
+import adminRoutes from './routes/admin.routes'; 
 
 // Inicialización
 dotenv.config();
