@@ -69,4 +69,11 @@ export class ProfesorModel {
     const result = await pool.query(query, [id]);
     return (result.rowCount ?? 0) > 0;
   }
+
+  static async findByUsuarioId(usuario_id: number): Promise<IProfesor | null> {
+    const query = `SELECT * FROM profesores WHERE usuario_id = $1;`;
+    const { rows } = await pool.query(query, [usuario_id]);
+    return rows[0] || null;
+  }
+  
 }

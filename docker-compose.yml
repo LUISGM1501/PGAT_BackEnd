@@ -1,0 +1,17 @@
+# docker-compose.yml
+version: '3'
+services:
+  postgres:
+    container_name: pgat-postgres
+    image: postgres:14
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pgat_tec_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

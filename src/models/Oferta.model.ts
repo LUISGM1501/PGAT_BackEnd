@@ -19,6 +19,7 @@ export interface IOferta {
   promedio_minimo?: number;
   cursos_requeridos?: string;
   beneficio: string;
+  motivo_rechazo?: string;
   fecha_creacion?: Date;
   fecha_actualizacion?: Date;
 }
@@ -29,11 +30,12 @@ export class OfertaModel {
     const query = `
       INSERT INTO ofertas (
         nombre, tipo, descripcion, vacantes, horas_semana, fecha_inicio, fecha_fin,
-        estado, escuela_id, profesor_id, promedio_minimo, cursos_requeridos, beneficio
+        estado, escuela_id, profesor_id, promedio_minimo, cursos_requeridos, beneficio,
+        motivo_rechazo
       )
       VALUES (
         $1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11, $12, $13
+        $8, $9, $10, $11, $12, $13, $14
       )
       RETURNING *;
     `;
@@ -51,6 +53,7 @@ export class OfertaModel {
       oferta.promedio_minimo || 70.0,
       oferta.cursos_requeridos || null,
       oferta.beneficio,
+      oferta.motivo_rechazo || null
     ];
     const { rows } = await pool.query(query, values);
     return rows[0];
@@ -87,6 +90,7 @@ export class OfertaModel {
         promedio_minimo = COALESCE($12, promedio_minimo),
         cursos_requeridos = COALESCE($13, cursos_requeridos),
         beneficio = COALESCE($14, beneficio),
+        motivo_rechazo = COALESCE($15, motivo_rechazo),
         fecha_actualizacion = CURRENT_TIMESTAMP
       WHERE id = $1
       RETURNING *;
@@ -106,6 +110,7 @@ export class OfertaModel {
       oferta.promedio_minimo,
       oferta.cursos_requeridos,
       oferta.beneficio,
+      oferta.motivo_rechazo
     ];
     const { rows } = await pool.query(query, values);
     return rows[0] || null;

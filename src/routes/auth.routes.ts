@@ -1,16 +1,11 @@
-import { Router } from 'express';
-// Importaremos los controladores cuando los creemos
-// import { login, register } from '../controllers/auth.controller';
+// src/routes/auth.routes.ts
+import { RequestHandler, Router } from 'express';
+import { login, logout } from '../controllers/auth/authController';
 
 const router = Router();
 
-// Por ahora, creamos rutas temporales para verificar funcionamiento
-router.post('/login', (req, res) => {
-  res.json({ message: 'Ruta de login funcionando (pendiente implementación)' });
-});
-
-router.post('/register', (req, res) => {
-  res.json({ message: 'Ruta de registro funcionando (pendiente implementación)' });
-});
+router.post('/login', (login as unknown) as RequestHandler);
+router.post('/logout', logout);
 
 export default router;
+

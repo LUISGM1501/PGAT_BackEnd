@@ -134,5 +134,5 @@ PGAT_BackEnd/
 Para ejecutar el proyecto en modo desarrollo, usa el siguiente comando:
 
 ```bash
-npx nodemon src/server.ts
+npx nodemon src/index.ts
 ```
