@@ -50,3 +50,5 @@ $RECYCLE.BIN/
 # Coverage directory used by tools like istanbul
 coverage/
 
+.qodo
+.history
