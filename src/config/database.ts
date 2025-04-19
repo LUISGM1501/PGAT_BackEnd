@@ -12,4 +12,14 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD
 });
 
+// Verificar conexión al iniciar
+pool.connect()
+  .then(client => {
+    console.log('Conexión a la base de datos exitosa');
+    client.release();
+  })
+  .catch(err => {
+    console.error('Error al conectar a la base de datos:', err.message);
+  });
+
 export default pool;

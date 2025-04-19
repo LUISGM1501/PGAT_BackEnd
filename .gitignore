@@ -6,8 +6,8 @@ npm-debug.log
 dist/
 *.tsbuildinfo
 
-# Environment variables
-.env
+# Environment variables (en un ambiente real deberia ignorar el .env, pero en este caso no para facilitar el ejemplo)
+#.env
 
 # Logs
 logs/
