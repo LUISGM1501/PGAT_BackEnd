@@ -1,7 +1,7 @@
 {
   "name": "pgat_backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Este documento detalla los pasos necesarios para configurar el backend del proyecto **PGAT-TEC** utilizando **Node.js** con **TypeScript**.",
   "main": "index.js",
   "directories": {
     "doc": "docs",
@@ -19,7 +19,7 @@
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
@@ -32,11 +32,20 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
     "@types/jsonwebtoken": "^9.0.9",
-    "@types/node": "^22.13.13",
-    "@types/pg": "^8.11.11",
+    "@types/node": "^22.14.1",
+    "@types/pg": "^8.11.13",
     "@types/sequelize": "^4.28.20",
     "nodemon": "^3.1.9",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2"
-  }
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LUISGM1501/PGAT_BackEnd.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/LUISGM1501/PGAT_BackEnd/issues"
+  },
+  "homepage": "https://github.com/LUISGM1501/PGAT_BackEnd#readme"
 }

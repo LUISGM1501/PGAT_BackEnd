@@ -49,6 +49,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction): Promis
     }
 
     const ofertaCreada = await OfertaModel.create(nuevaOferta);
+    if (!ofertaCreada) {
+      res.status(500).json({ mensaje: 'Error al crear la oferta' });
+      return;
+    }
     res.status(201).json(ofertaCreada);
   } catch (error) {
     next(error);
@@ -59,7 +63,17 @@ router.post('/', async (req: Request, res: Response, next: NextFunction): Promis
 router.put('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ mensaje: 'ID inválido' });
+      return;
+    }
+
     const ofertaData: Partial<IOferta> = req.body;
+    if (Object.keys(ofertaData).length === 0) {
+      res.status(400).json({ mensaje: 'No se proporcionaron datos para actualizar' });
+      return;
+    }
+
     const ofertaActualizada = await OfertaModel.update(id, ofertaData);
     if (!ofertaActualizada) {
       res.status(404).json({ mensaje: 'Oferta no encontrada' });
@@ -75,6 +89,11 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction): Prom
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ mensaje: 'ID inválido' });
+      return;
+    }
+
     const eliminado = await OfertaModel.delete(id);
     if (!eliminado) {
       res.status(404).json({ mensaje: 'Oferta no encontrada' });
