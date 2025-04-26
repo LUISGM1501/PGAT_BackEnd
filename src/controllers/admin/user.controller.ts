@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
+import bcrypt from 'bcrypt';
 import { UsuarioModel, IUsuario } from '../../models/Usuario.model';
 import { EstudianteModel } from '../../models/Estudiante.model';
 import { ProfesorModel } from '../../models/Profesor.model';
 import { EscuelaModel } from '../../models/Escuela.model';
-import bcrypt from 'bcrypt';
 import pool from '../../config/database';
+import { PasswordService } from '../../services/password.service';
 
 /**
  * Obtiene la lista de usuarios con filtros y paginación
@@ -167,11 +168,13 @@ export const getUserDetails = async (req: Request, res: Response): Promise<void>
  */
 export const createUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { nombre, correo, password, tipo, ...profileData } = req.body;
+    const { nombre, correo, password, tipo, estudiante, profesor, escuela } = req.body;
+    console.log(`[USER] Creando nuevo usuario tipo: ${tipo}, correo: ${correo}`);
     
     // Validar correo institucional
     const emailRegex = /@(estudiantec\.cr|itcr\.ac\.cr)$/;
     if (!emailRegex.test(correo)) {
+      console.log('Correo institucional inválido:', correo);
       res.status(400).json({
         success: false,
         message: 'Debe utilizar un correo institucional válido'
@@ -182,6 +185,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
     // Verificar si el correo ya existe
     const existingUser = await UsuarioModel.findByEmail(correo);
     if (existingUser) {
+      console.log('Correo ya registrado:', correo);
       res.status(400).json({
         success: false,
         message: 'El correo electrónico ya está registrado'
@@ -189,11 +193,11 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
       return;
     }
     
-    // Encriptar contraseña
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Hashear la contraseña
+    const hashedPassword = await PasswordService.hashPassword(password);
+    console.log(`[USER] Contraseña hasheada exitosamente`);
     
-    // Crear usuario base
+    // Crear usuario base con contraseña hasheada
     const newUser = await UsuarioModel.create({
       nombre,
       correo,
@@ -201,38 +205,59 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
       tipo,
       estado: 'activo'
     });
+    console.log(`[USER] Usuario creado exitosamente con ID: ${newUser.id}`);
     
     // Crear perfil específico según el tipo
     let specificProfile = null;
+    console.log('Creando perfil específico, tipo:', tipo);
+    console.log('ID del usuario creado:', newUser.id);
     
     switch (tipo) {
       case 'estudiante':
-        specificProfile = await EstudianteModel.create({
-          usuario_id: newUser.id as number,
-          carnet: profileData.carnet,
-          carrera: profileData.carrera,
-          nivel: profileData.nivel,
-          promedio: profileData.promedio || 0,
-          cursosAprobados: profileData.cursosAprobados || [],
-          habilidades: profileData.habilidades || []
-        });
+        if (estudiante) {
+          console.log('Datos de estudiante a crear:', JSON.stringify(estudiante, null, 2));
+          specificProfile = await EstudianteModel.create({
+            usuario_id: newUser.id as number,
+            carnet: estudiante.carnet,
+            carrera: estudiante.carrera,
+            nivel: estudiante.nivel,
+            promedio: estudiante.promedio || 0,
+            cursosAprobados: estudiante.cursosAprobados || [],
+            habilidades: estudiante.habilidades || []
+          });
+          console.log('Perfil de estudiante creado:', specificProfile);
+        } else {
+          console.error('No se proporcionaron datos de estudiante');
+        }
         break;
       case 'profesor':
-        specificProfile = await ProfesorModel.create({
-          usuario_id: newUser.id as number,
-          departamento: profileData.departamento,
-          especialidad: profileData.especialidad,
-          telefono: profileData.telefono
-        });
+        if (profesor) {
+          console.log('Datos de profesor a crear:', JSON.stringify(profesor, null, 2));
+          specificProfile = await ProfesorModel.create({
+            usuario_id: newUser.id as number,
+            departamento: profesor.departamento,
+            especialidad: profesor.especialidad,
+            telefono: profesor.telefono
+          });
+          console.log('Perfil de profesor creado:', specificProfile);
+        } else {
+          console.error('No se proporcionaron datos de profesor');
+        }
         break;
       case 'escuela':
-        specificProfile = await EscuelaModel.create({
-          usuario_id: newUser.id as number,
-          facultad: profileData.facultad,
-          responsable: profileData.responsable,
-          telefono: profileData.telefono,
-          descripcion: profileData.descripcion
-        });
+        if (escuela) {
+          console.log('Datos de escuela a crear:', JSON.stringify(escuela, null, 2));
+          specificProfile = await EscuelaModel.create({
+            usuario_id: newUser.id as number,
+            facultad: escuela.facultad,
+            responsable: escuela.responsable,
+            telefono: escuela.telefono,
+            descripcion: escuela.descripcion
+          });
+          console.log('Perfil de escuela creado:', specificProfile);
+        } else {
+          console.error('No se proporcionaron datos de escuela');
+        }
         break;
     }
     
@@ -247,8 +272,21 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
       },
       message: 'Usuario creado correctamente'
     });
+    console.log('Usuario creado correctamente:', userWithoutPassword);
   } catch (error) {
-    console.error('Error creando usuario:', error);
+    // Me cago en todo
+    console.log('Error al crear usuario:', error);
+    console.log('Datos recibidos para crear usuario:', req.body);
+    console.log('Tipo de usuario:', req.body.tipo);
+    console.log('Perfil específico:', req.body.profileData);
+    console.log('Correo:', req.body.correo);
+    console.log('Contraseña:', req.body.password);
+    console.log('Nombre:', req.body.nombre);
+    console.log('Estado:', req.body.estado);
+    console.log('Tipo:', req.body.tipo);
+    console.log('Perfil:', req.body.profileData);
+
+    
     res.status(500).json({
       success: false,
       message: 'Error al crear usuario'

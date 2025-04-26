@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { OfertaModel, IOferta } from '../../models/Oferta.model';
 import pool from '../../config/database';
 
 /**
@@ -113,6 +112,7 @@ export const getPendingContent = async (req: Request, res: Response): Promise<vo
 export const getContentDetails = async (req: Request, res: Response): Promise<void> => {
   try {
     const contentId = parseInt(req.params.id);
+    console.log(`Obteniendo detalles para la oferta con ID: ${contentId}`);
     
     if (isNaN(contentId)) {
       res.status(400).json({
@@ -122,41 +122,46 @@ export const getContentDetails = async (req: Request, res: Response): Promise<vo
       return;
     }
     
-    // Obtener oferta con información adicional
+    // Consulta modificada con nombres de alias correctos
     const query = `
-      SELECT o.*, 
-             e.nombre as escuela_nombre,
-             u_e.correo as escuela_correo,
-             p.nombre as profesor_nombre,
-             u_p.correo as profesor_correo
+      SELECT 
+        o.*,
+        e.nombre as escuela_nombre,
+        p.nombre as profesor_nombre
       FROM ofertas o
       LEFT JOIN escuelas e ON o.escuela_id = e.id
-      LEFT JOIN usuarios u_e ON e.usuario_id = u_e.id
       LEFT JOIN profesores p ON o.profesor_id = p.id
-      LEFT JOIN usuarios u_p ON p.usuario_id = u_p.id
       WHERE o.id = $1
     `;
     
-    const result = await pool.query(query, [contentId]);
-    
-    if (result.rows.length === 0) {
-      res.status(404).json({
-        success: false,
-        message: 'Oferta no encontrada'
+    try {
+      const result = await pool.query(query, [contentId]);
+      
+      if (result.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          message: 'Oferta no encontrada'
+        });
+        return;
+      }
+      
+      res.status(200).json({
+        success: true,
+        data: result.rows[0],
+        message: 'Detalles de oferta obtenidos correctamente'
       });
-      return;
+    } catch (error) {
+      console.error(`Error obteniendo detalles de oferta para ID: ${contentId}`, error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener detalles de la oferta'
+      });
     }
-    
-    res.status(200).json({
-      success: true,
-      data: result.rows[0],
-      message: 'Detalles de oferta obtenidos correctamente'
-    });
   } catch (error) {
-    console.error('Error obteniendo detalles de oferta:', error);
+    console.error('Error general en getContentDetails:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener detalles de la oferta'
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -176,38 +181,37 @@ export const approveContent = async (req: Request, res: Response): Promise<void>
       return;
     }
     
-    // Verificar si la oferta existe y está pendiente
-    const oferta = await OfertaModel.findById(contentId);
+    // Ejecutar SQL directo en lugar de usar el modelo
+    const query = `
+      UPDATE ofertas
+      SET estado = 'activa'
+      WHERE id = $1
+      RETURNING *;
+    `;
     
-    if (!oferta) {
-      res.status(404).json({
-        success: false,
-        message: 'Oferta no encontrada'
+    try {
+      const result = await pool.query(query, [contentId]);
+      
+      if (result.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          message: 'Oferta no encontrada'
+        });
+        return;
+      }
+      
+      res.status(200).json({
+        success: true,
+        data: result.rows[0],
+        message: 'Oferta aprobada correctamente'
       });
-      return;
-    }
-    
-    if (oferta.estado !== 'pendiente') {
-      res.status(400).json({
+    } catch (updateError) {
+      console.error('Error en actualización de oferta:', updateError);
+      res.status(500).json({
         success: false,
-        message: `La oferta no está pendiente, su estado actual es: ${oferta.estado}`
+        message: 'Error al actualizar el estado de la oferta'
       });
-      return;
     }
-    
-    // Actualizar estado de la oferta
-    const updatedOffer = await OfertaModel.update(contentId, { 
-      estado: 'activa' 
-    });
-    
-    // Enviar notificación al creador de la oferta
-    // Implementación pendiente - depende del sistema de notificaciones
-    
-    res.status(200).json({
-      success: true,
-      data: updatedOffer,
-      message: 'Oferta aprobada correctamente'
-    });
   } catch (error) {
     console.error('Error aprobando oferta:', error);
     res.status(500).json({
@@ -223,7 +227,6 @@ export const approveContent = async (req: Request, res: Response): Promise<void>
 export const rejectContent = async (req: Request, res: Response): Promise<void> => {
   try {
     const contentId = parseInt(req.params.id);
-    const { motivo } = req.body;
     
     if (isNaN(contentId)) {
       res.status(400).json({
@@ -233,47 +236,42 @@ export const rejectContent = async (req: Request, res: Response): Promise<void> 
       return;
     }
     
-    if (!motivo) {
-      res.status(400).json({
-        success: false,
-        message: 'Debe proporcionar un motivo para rechazar la oferta'
+    // Ejecutar SQL directo en lugar de usar el modelo, evitando la columna motivo_rechazo
+    const query = `
+      UPDATE ofertas
+      SET estado = 'cancelada'
+      WHERE id = $1
+      RETURNING *;
+    `;
+    
+    try {
+      const result = await pool.query(query, [contentId]);
+      
+      if (result.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          message: 'Oferta no encontrada'
+        });
+        return;
+      }
+      
+      // Solo loguear el motivo, no intentar guardarlo
+      if (req.body.motivo) {
+        console.log(`Oferta ${contentId} rechazada. Motivo: ${req.body.motivo}`);
+      }
+      
+      res.status(200).json({
+        success: true,
+        data: result.rows[0],
+        message: 'Oferta rechazada correctamente'
       });
-      return;
-    }
-    
-    // Verificar si la oferta existe y está pendiente
-    const oferta = await OfertaModel.findById(contentId);
-    
-    if (!oferta) {
-      res.status(404).json({
+    } catch (updateError) {
+      console.error('Error en actualización de oferta:', updateError);
+      res.status(500).json({
         success: false,
-        message: 'Oferta no encontrada'
+        message: 'Error al actualizar el estado de la oferta'
       });
-      return;
     }
-    
-    if (oferta.estado !== 'pendiente') {
-      res.status(400).json({
-        success: false,
-        message: `La oferta no está pendiente, su estado actual es: ${oferta.estado}`
-      });
-      return;
-    }
-    
-    // Actualizar estado de la oferta
-    const updatedOffer = await OfertaModel.update(contentId, { 
-      estado: 'cancelada',
-      motivo_rechazo: motivo
-    });
-    
-    // Enviar notificación al creador de la oferta
-    // Implementación pendiente - depende del sistema de notificaciones
-    
-    res.status(200).json({
-      success: true,
-      data: updatedOffer,
-      message: 'Oferta rechazada correctamente'
-    });
   } catch (error) {
     console.error('Error rechazando oferta:', error);
     res.status(500).json({
@@ -288,6 +286,8 @@ export const rejectContent = async (req: Request, res: Response): Promise<void> 
  */
 export const getAllContent = async (req: Request, res: Response) => {
   try {
+    console.log('Iniciando obtención de todas las ofertas');
+    
     // Extraer parámetros de consulta
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
@@ -297,25 +297,24 @@ export const getAllContent = async (req: Request, res: Response) => {
     const profesorId = req.query.profesor_id as string;
     const search = req.query.search as string;
     
+    console.log(`Parámetros de consulta recibidos: page=${page}, limit=${limit}, tipo=${tipo}, estado=${estado}, escuelaId=${escuelaId}, profesorId=${profesorId}, search=${search}`);
+    
     // Calcular offset para paginación
     const offset = (page - 1) * limit;
+    console.log(`Offset calculado para paginación: ${offset}`);
     
-    // Construir consulta base
+    // Construir consulta base - Corrige los alias de tabla
     let query = `
       SELECT o.*, 
-             e.nombre as escuela_nombre, 
-             COALESCE(p.nombre, 'N/A') as profesor_nombre
+             COALESCE((SELECT nombre FROM escuelas WHERE id = o.escuela_id), 'N/A') as escuela_nombre, 
+             COALESCE((SELECT nombre FROM profesores WHERE id = o.profesor_id), 'N/A') as profesor_nombre
       FROM ofertas o
-      LEFT JOIN escuelas e ON o.escuela_id = e.id
-      LEFT JOIN profesores p ON o.profesor_id = p.id
       WHERE 1=1
     `;
     
     let countQuery = `
       SELECT COUNT(*) as total
       FROM ofertas o
-      LEFT JOIN escuelas e ON o.escuela_id = e.id
-      LEFT JOIN profesores p ON o.profesor_id = p.id
       WHERE 1=1
     `;
     
@@ -362,6 +361,8 @@ export const getAllContent = async (req: Request, res: Response) => {
     query += ` ORDER BY o.fecha_creacion DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
     queryParams.push(limit, offset);
     
+    console.log('Ejecutando consultas de base de datos');
+    
     // Ejecutar consultas
     const [offersResult, countResult] = await Promise.all([
       pool.query(query, queryParams),
@@ -371,6 +372,8 @@ export const getAllContent = async (req: Request, res: Response) => {
     const offers = offersResult.rows;
     const totalOffers = parseInt(countResult.rows[0].total);
     const totalPages = Math.ceil(totalOffers / limit);
+    
+    console.log(`Ofertas obtenidas: ${offers.length}, Total de ofertas: ${totalOffers}, Total de páginas: ${totalPages}`);
     
     return res.status(200).json({
       success: true,

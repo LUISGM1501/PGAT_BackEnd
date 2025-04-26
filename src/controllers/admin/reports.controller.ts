@@ -6,13 +6,36 @@ import pool from '../../config/database';
  */
 export const generateUsersReport = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Parámetros para filtrar el reporte
-    const startDate = req.query.start_date as string;
-    const endDate = req.query.end_date as string;
-    const tipo = req.query.tipo as string;
-    const estado = req.query.estado as string;
+    // Obtener parámetros
+    const { period, tipo, estado } = req.query;
+    let startDate, endDate;
     
-    // Construir consulta base
+    // Calcular fechas según el período
+    switch(period) {
+      case 'week':
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+        endDate = new Date();
+        break;
+      case 'month':
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 1);
+        endDate = new Date();
+        break;
+      case 'semester':
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 6);
+        endDate = new Date();
+        break;
+      case 'year':
+        startDate = new Date();
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        endDate = new Date();
+        break;
+      // Si es 'all' o no hay período, no ponemos filtro de fechas
+    }
+    
+    // Construir consulta
     let query = `
       SELECT 
         u.id,
@@ -47,15 +70,15 @@ export const generateUsersReport = async (req: Request, res: Response): Promise<
     
     const queryParams: any[] = [];
     
-    // Añadir filtros si se proporcionan
+    // Añadir filtros de fechas si los hay
     if (startDate) {
       query += ` AND u.fecha_creacion >= $${queryParams.length + 1}`;
-      queryParams.push(startDate);
+      queryParams.push(startDate.toISOString());
     }
     
     if (endDate) {
       query += ` AND u.fecha_creacion <= $${queryParams.length + 1}`;
-      queryParams.push(endDate);
+      queryParams.push(endDate.toISOString());
     }
     
     if (tipo) {
@@ -68,19 +91,19 @@ export const generateUsersReport = async (req: Request, res: Response): Promise<
       queryParams.push(estado);
     }
     
-    // Ordenar resultados
+    // Ordenar por fecha de creación
     query += ` ORDER BY u.fecha_creacion DESC`;
     
     // Ejecutar consulta
     const result = await pool.query(query, queryParams);
     
-    // Preparar estadísticas adicionales para el reporte
+    // Estadísticas adicionales para el reporte
     const countByTypeQuery = `
       SELECT tipo, COUNT(*) as total
       FROM usuarios
       WHERE 1=1
-      ${startDate ? ` AND fecha_creacion >= '${startDate}'` : ''}
-      ${endDate ? ` AND fecha_creacion <= '${endDate}'` : ''}
+      ${startDate ? ` AND fecha_creacion >= $1` : ''}
+      ${endDate ? ` AND fecha_creacion <= $2` : ''}
       ${estado ? ` AND estado = '${estado}'` : ''}
       GROUP BY tipo
     `;
@@ -89,15 +112,19 @@ export const generateUsersReport = async (req: Request, res: Response): Promise<
       SELECT estado, COUNT(*) as total
       FROM usuarios
       WHERE 1=1
-      ${startDate ? ` AND fecha_creacion >= '${startDate}'` : ''}
-      ${endDate ? ` AND fecha_creacion <= '${endDate}'` : ''}
+      ${startDate ? ` AND fecha_creacion >= $1` : ''}
+      ${endDate ? ` AND fecha_creacion <= $2` : ''}
       ${tipo ? ` AND tipo = '${tipo}'` : ''}
       GROUP BY estado
     `;
     
+    const typeStatsParams = [];
+    if (startDate) typeStatsParams.push(startDate.toISOString());
+    if (endDate) typeStatsParams.push(endDate.toISOString());
+    
     const [typeStats, statusStats] = await Promise.all([
-      pool.query(countByTypeQuery),
-      pool.query(countByStatusQuery)
+      pool.query(countByTypeQuery, typeStatsParams),
+      pool.query(countByStatusQuery, typeStatsParams)
     ]);
     
     // Construir respuesta
@@ -105,8 +132,9 @@ export const generateUsersReport = async (req: Request, res: Response): Promise<
       metadata: {
         generatedAt: new Date(),
         filters: {
-          startDate: startDate || 'No especificada',
-          endDate: endDate || 'No especificada',
+          period: period || 'all',
+          startDate: startDate ? startDate.toISOString().split('T')[0] : null,
+          endDate: endDate ? endDate.toISOString().split('T')[0] : null,
           tipo: tipo || 'Todos',
           estado: estado || 'Todos'
         },
@@ -139,116 +167,93 @@ export const generateUsersReport = async (req: Request, res: Response): Promise<
 export const generateOffersReport = async (req: Request, res: Response): Promise<void> => {
   try {
     // Parámetros para filtrar el reporte
-    const startDate = req.query.start_date as string;
-    const endDate = req.query.end_date as string;
-    const tipo = req.query.tipo as string;
-    const estado = req.query.estado as string;
-    const escuelaId = req.query.escuela_id as string;
+    const { period } = req.query;
+    let startDate, endDate;
     
-    // Construir consulta base
+    // Calcular fechas según el período
+    switch(period) {
+      case 'week':
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+        endDate = new Date();
+        break;
+      case 'month':
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 1);
+        endDate = new Date();
+        break;
+      case 'semester':
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 6);
+        endDate = new Date();
+        break;
+      case 'year':
+        startDate = new Date();
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        endDate = new Date();
+        break;
+      // Si es 'all' o no hay período, no ponemos filtro de fechas
+    }
+    
+    // Construir consulta (corregida para evitar el error con e.nombre)
     let query = `
       SELECT 
-        o.id,
-        o.nombre,
-        o.tipo,
-        o.descripcion,
-        o.vacantes,
-        o.horas_semana,
-        o.fecha_inicio,
-        o.fecha_fin,
-        o.estado,
-        o.fecha_creacion,
-        e.nombre as escuela_nombre,
-        p.nombre as profesor_nombre,
-        o.promedio_minimo,
-        o.cursos_requeridos,
-        o.beneficio,
-        (SELECT COUNT(*) FROM postulaciones WHERE oferta_id = o.id) as total_postulaciones,
-        (SELECT COUNT(*) FROM postulaciones WHERE oferta_id = o.id AND estado = 'aprobada') as postulaciones_aprobadas
+        o.*,
+        (SELECT nombre FROM escuelas WHERE id = o.escuela_id) as escuela_nombre,
+        (SELECT nombre FROM profesores WHERE id = o.profesor_id) as profesor_nombre,
+        (SELECT COUNT(*) FROM postulaciones WHERE oferta_id = o.id) as total_postulaciones
       FROM ofertas o
-      LEFT JOIN escuelas e ON o.escuela_id = e.id
-      LEFT JOIN profesores p ON o.profesor_id = p.id
       WHERE 1=1
     `;
     
     const queryParams: any[] = [];
     
-    // Añadir filtros si se proporcionan
+    // Añadir filtros de fechas si los hay
     if (startDate) {
       query += ` AND o.fecha_creacion >= $${queryParams.length + 1}`;
-      queryParams.push(startDate);
+      queryParams.push(startDate.toISOString());
     }
     
     if (endDate) {
       query += ` AND o.fecha_creacion <= $${queryParams.length + 1}`;
-      queryParams.push(endDate);
+      queryParams.push(endDate.toISOString());
     }
     
-    if (tipo) {
-      query += ` AND o.tipo = $${queryParams.length + 1}`;
-      queryParams.push(tipo);
-    }
-    
-    if (estado) {
-      query += ` AND o.estado = $${queryParams.length + 1}`;
-      queryParams.push(estado);
-    }
-    
-    if (escuelaId) {
-      query += ` AND o.escuela_id = $${queryParams.length + 1}`;
-      queryParams.push(parseInt(escuelaId));
-    }
-    
-    // Ordenar resultados
+    // Ordenar por fecha de creación
     query += ` ORDER BY o.fecha_creacion DESC`;
     
     // Ejecutar consulta
     const result = await pool.query(query, queryParams);
     
-    // Preparar estadísticas adicionales para el reporte
+    // Estadísticas adicionales para el reporte - Contar por tipo
     const countByTypeQuery = `
       SELECT tipo, COUNT(*) as total
       FROM ofertas
       WHERE 1=1
-      ${startDate ? ` AND fecha_creacion >= '${startDate}'` : ''}
-      ${endDate ? ` AND fecha_creacion <= '${endDate}'` : ''}
-      ${estado ? ` AND estado = '${estado}'` : ''}
-      ${escuelaId ? ` AND escuela_id = ${escuelaId}` : ''}
+      ${startDate ? ` AND fecha_creacion >= $1` : ''}
+      ${endDate ? ` AND fecha_creacion <= $2` : ''}
       GROUP BY tipo
     `;
     
-    const countByStatusQuery = `
-      SELECT estado, COUNT(*) as total
-      FROM ofertas
-      WHERE 1=1
-      ${startDate ? ` AND fecha_creacion >= '${startDate}'` : ''}
-      ${endDate ? ` AND fecha_creacion <= '${endDate}'` : ''}
-      ${tipo ? ` AND tipo = '${tipo}'` : ''}
-      ${escuelaId ? ` AND escuela_id = ${escuelaId}` : ''}
-      GROUP BY estado
-    `;
+    const typeStatsParams = [];
+    if (startDate) typeStatsParams.push(startDate.toISOString());
+    if (endDate) typeStatsParams.push(endDate.toISOString());
     
-    const [typeStats, statusStats] = await Promise.all([
-      pool.query(countByTypeQuery),
-      pool.query(countByStatusQuery)
-    ]);
+    const typeStats = await pool.query(countByTypeQuery, typeStatsParams);
     
     // Construir respuesta
     const report = {
       metadata: {
         generatedAt: new Date(),
         filters: {
-          startDate: startDate || 'No especificada',
-          endDate: endDate || 'No especificada',
-          tipo: tipo || 'Todos',
-          estado: estado || 'Todos',
-          escuela: escuelaId || 'Todas'
+          period: period || 'all',
+          startDate: startDate ? startDate.toISOString().split('T')[0] : null,
+          endDate: endDate ? endDate.toISOString().split('T')[0] : null,
         },
         totalRecords: result.rows.length
       },
       statistics: {
-        byType: typeStats.rows,
-        byStatus: statusStats.rows
+        byType: typeStats.rows
       },
       data: result.rows
     };
@@ -273,126 +278,105 @@ export const generateOffersReport = async (req: Request, res: Response): Promise
 export const generateApplicationsReport = async (req: Request, res: Response): Promise<void> => {
   try {
     // Parámetros para filtrar el reporte
-    const startDate = req.query.start_date as string;
-    const endDate = req.query.end_date as string;
-    const estado = req.query.estado as string;
-    const escuelaId = req.query.escuela_id as string;
-    const tipoOferta = req.query.tipo_oferta as string;
+    console.log(req.query); 
+    const { period } = req.query;
+    let startDate, endDate;
     
-    // Construir consulta base
+    // Calcular fechas según el período
+    console.log(period);
+    switch(period) {
+      case 'week':
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+        endDate = new Date();
+        break;
+      case 'month':
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 1);
+        endDate = new Date();
+        break;
+      case 'semester':
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 6);
+        endDate = new Date();
+        break;
+      case 'year':
+        startDate = new Date();
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        endDate = new Date();
+        break;
+      // Si es 'all' o no hay período, no ponemos filtro de fechas
+    }
+    
+    // Construir consulta (corregida para evitar el error con esc.nombre)
     let query = `
-      SELECT 
-        p.id,
-        p.estudiante_id,
-        p.oferta_id,
-        p.fecha_postulacion,
-        p.estado,
-        p.fecha_actualizacion,
-        e.carnet as estudiante_carnet,
-        ue.nombre as estudiante_nombre,
-        e.carrera as estudiante_carrera,
-        o.nombre as oferta_nombre,
-        o.tipo as oferta_tipo,
-        o.fecha_inicio as oferta_inicio,
-        o.fecha_fin as oferta_fin,
-        esc.nombre as escuela_nombre,
-        prof.nombre as profesor_nombre,
-        be.tipo as tipo_beneficio,
-        be.monto_total as monto_beneficio,
-        be.porcentaje_exoneracion
-      FROM postulaciones p
-      JOIN estudiantes e ON p.estudiante_id = e.id
-      JOIN usuarios ue ON e.usuario_id = ue.id
-      JOIN ofertas o ON p.oferta_id = o.id
-      LEFT JOIN escuelas esc ON o.escuela_id = esc.id
-      LEFT JOIN profesores prof ON o.profesor_id = prof.id
-      LEFT JOIN beneficios_economicos be ON p.id = be.postulacion_id
-      WHERE 1=1
-    `;
+    SELECT 
+      p.*,
+      o.nombre as oferta_nombre,
+      o.tipo as oferta_tipo,
+      o.escuela_id,
+      e.carnet as estudiante_carnet,
+      u.nombre as estudiante_nombre
+    FROM postulaciones p
+    JOIN ofertas o ON p.oferta_id = o.id
+    JOIN estudiantes e ON p.estudiante_id = e.id
+    JOIN usuarios u ON e.usuario_id = u.id
+    WHERE 1=1
+  `;
     
     const queryParams: any[] = [];
+    console.log(queryParams);
     
-    // Añadir filtros si se proporcionan
+    // Añadir filtros de fechas si los hay
     if (startDate) {
       query += ` AND p.fecha_postulacion >= $${queryParams.length + 1}`;
-      queryParams.push(startDate);
+      queryParams.push(startDate.toISOString());
     }
     
     if (endDate) {
       query += ` AND p.fecha_postulacion <= $${queryParams.length + 1}`;
-      queryParams.push(endDate);
+      queryParams.push(endDate.toISOString());
     }
     
-    if (estado) {
-      query += ` AND p.estado = $${queryParams.length + 1}`;
-      queryParams.push(estado);
-    }
-    
-    if (escuelaId) {
-      query += ` AND o.escuela_id = $${queryParams.length + 1}`;
-      queryParams.push(parseInt(escuelaId));
-    }
-    
-    if (tipoOferta) {
-      query += ` AND o.tipo = $${queryParams.length + 1}`;
-      queryParams.push(tipoOferta);
-    }
-    
-    // Ordenar resultados
+    // Ordenar por fecha de postulación
     query += ` ORDER BY p.fecha_postulacion DESC`;
     
     // Ejecutar consulta
     const result = await pool.query(query, queryParams);
     
-    // Preparar estadísticas adicionales para el reporte
+    // Estadísticas adicionales para el reporte
     const countByStatusQuery = `
-      SELECT p.estado, COUNT(*) as total
-      FROM postulaciones p
-      JOIN ofertas o ON p.oferta_id = o.id
+      SELECT estado, COUNT(*) as total
+      FROM postulaciones
       WHERE 1=1
-      ${startDate ? ` AND p.fecha_postulacion >= '${startDate}'` : ''}
-      ${endDate ? ` AND p.fecha_postulacion <= '${endDate}'` : ''}
-      ${escuelaId ? ` AND o.escuela_id = ${escuelaId}` : ''}
-      ${tipoOferta ? ` AND o.tipo = '${tipoOferta}'` : ''}
-      GROUP BY p.estado
+      ${startDate ? ` AND fecha_postulacion >= $1` : ''}
+      ${endDate ? ` AND fecha_postulacion <= $2` : ''}
+      GROUP BY estado
     `;
     
-    const countByOfferTypeQuery = `
-      SELECT o.tipo, COUNT(*) as total
-      FROM postulaciones p
-      JOIN ofertas o ON p.oferta_id = o.id
-      WHERE 1=1
-      ${startDate ? ` AND p.fecha_postulacion >= '${startDate}'` : ''}
-      ${endDate ? ` AND p.fecha_postulacion <= '${endDate}'` : ''}
-      ${estado ? ` AND p.estado = '${estado}'` : ''}
-      ${escuelaId ? ` AND o.escuela_id = ${escuelaId}` : ''}
-      GROUP BY o.tipo
-    `;
+    const statusStatsParams = [];
+    if (startDate) statusStatsParams.push(startDate.toISOString());
+    if (endDate) statusStatsParams.push(endDate.toISOString());
     
-    const [statusStats, offerTypeStats] = await Promise.all([
-      pool.query(countByStatusQuery),
-      pool.query(countByOfferTypeQuery)
-    ]);
+    const statusStats = await pool.query(countByStatusQuery, statusStatsParams);
     
     // Construir respuesta
     const report = {
       metadata: {
         generatedAt: new Date(),
         filters: {
-          startDate: startDate || 'No especificada',
-          endDate: endDate || 'No especificada',
-          estado: estado || 'Todos',
-          escuela: escuelaId || 'Todas',
-          tipoOferta: tipoOferta || 'Todos'
+          period: period || 'all',
+          startDate: startDate ? startDate.toISOString().split('T')[0] : null,
+          endDate: endDate ? endDate.toISOString().split('T')[0] : null,
         },
         totalRecords: result.rows.length
       },
       statistics: {
-        byStatus: statusStats.rows,
-        byOfferType: offerTypeStats.rows
+        byStatus: statusStats.rows
       },
       data: result.rows
     };
+    console.log(report);
     
     res.status(200).json({
       success: true,
@@ -414,146 +398,98 @@ export const generateApplicationsReport = async (req: Request, res: Response): P
 export const generateBenefitsReport = async (req: Request, res: Response): Promise<void> => {
   try {
     // Parámetros para filtrar el reporte
-    const startDate = req.query.start_date as string;
-    const endDate = req.query.end_date as string;
-    const tipo = req.query.tipo as string;
-    const estado = req.query.estado as string;
-    const escuelaId = req.query.escuela_id as string;
+    const { period } = req.query;
+    let startDate, endDate;
     
-    // Construir consulta base
+    // Calcular fechas según el período
+    switch(period) {
+      case 'week':
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+        endDate = new Date();
+        break;
+      case 'month':
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 1);
+        endDate = new Date();
+        break;
+      case 'semester':
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 6);
+        endDate = new Date();
+        break;
+      case 'year':
+        startDate = new Date();
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        endDate = new Date();
+        break;
+      // Si es 'all' o no hay período, no ponemos filtro de fechas
+    }
+    
+    // En este caso, para evitar errores de columnas inexistentes, simplificaremos la consulta
     let query = `
       SELECT 
-        be.id,
-        be.postulacion_id,
-        be.tipo,
-        be.porcentaje_exoneracion,
-        be.monto_por_hora,
-        be.total_horas,
-        be.monto_total,
-        be.estado,
-        be.fecha_creacion,
-        p.estado as estado_postulacion,
-        e.carnet as estudiante_carnet,
-        ue.nombre as estudiante_nombre,
+        be.*,
         o.nombre as oferta_nombre,
         o.tipo as oferta_tipo,
-        esc.nombre as escuela_nombre
+        p.estado as postulacion_estado,
+        u.nombre as estudiante_nombre
       FROM beneficios_economicos be
       JOIN postulaciones p ON be.postulacion_id = p.id
-      JOIN estudiantes e ON p.estudiante_id = e.id
-      JOIN usuarios ue ON e.usuario_id = ue.id
       JOIN ofertas o ON p.oferta_id = o.id
-      LEFT JOIN escuelas esc ON o.escuela_id = esc.id
+      JOIN estudiantes e ON p.estudiante_id = e.id
+      JOIN usuarios u ON e.usuario_id = u.id
       WHERE 1=1
     `;
     
     const queryParams: any[] = [];
     
-    // Añadir filtros si se proporcionan
+    // Añadir filtros de fechas si los hay
     if (startDate) {
       query += ` AND be.fecha_creacion >= $${queryParams.length + 1}`;
-      queryParams.push(startDate);
+      queryParams.push(startDate.toISOString());
     }
     
     if (endDate) {
       query += ` AND be.fecha_creacion <= $${queryParams.length + 1}`;
-      queryParams.push(endDate);
+      queryParams.push(endDate.toISOString());
     }
     
-    if (tipo) {
-      query += ` AND be.tipo = $${queryParams.length + 1}`;
-      queryParams.push(tipo);
-    }
-    
-    if (estado) {
-      query += ` AND be.estado = $${queryParams.length + 1}`;
-      queryParams.push(estado);
-    }
-    
-    if (escuelaId) {
-      query += ` AND o.escuela_id = $${queryParams.length + 1}`;
-      queryParams.push(parseInt(escuelaId));
-    }
-    
-    // Ordenar resultados
+    // Ordenar por fecha de creación
     query += ` ORDER BY be.fecha_creacion DESC`;
     
     // Ejecutar consulta
     const result = await pool.query(query, queryParams);
     
-    // Preparar estadísticas adicionales para el reporte
+    // Estadísticas adicionales para el reporte
     const countByTypeQuery = `
-      SELECT be.tipo, COUNT(*) as total, SUM(COALESCE(be.monto_total, 0)) as suma_total
-      FROM beneficios_economicos be
-      JOIN postulaciones p ON be.postulacion_id = p.id
-      JOIN ofertas o ON p.oferta_id = o.id
+      SELECT tipo, COUNT(*) as total, SUM(COALESCE(monto_total, 0)) as suma_total
+      FROM beneficios_economicos
       WHERE 1=1
-      ${startDate ? ` AND be.fecha_creacion >= '${startDate}'` : ''}
-      ${endDate ? ` AND be.fecha_creacion <= '${endDate}'` : ''}
-      ${estado ? ` AND be.estado = '${estado}'` : ''}
-      ${escuelaId ? ` AND o.escuela_id = ${escuelaId}` : ''}
-      GROUP BY be.tipo
+      ${startDate ? ` AND fecha_creacion >= $1` : ''}
+      ${endDate ? ` AND fecha_creacion <= $2` : ''}
+      GROUP BY tipo
     `;
     
-    const countByStatusQuery = `
-      SELECT be.estado, COUNT(*) as total, SUM(COALESCE(be.monto_total, 0)) as suma_total
-      FROM beneficios_economicos be
-      JOIN postulaciones p ON be.postulacion_id = p.id
-      JOIN ofertas o ON p.oferta_id = o.id
-      WHERE 1=1
-      ${startDate ? ` AND be.fecha_creacion >= '${startDate}'` : ''}
-      ${endDate ? ` AND be.fecha_creacion <= '${endDate}'` : ''}
-      ${tipo ? ` AND be.tipo = '${tipo}'` : ''}
-      ${escuelaId ? ` AND o.escuela_id = ${escuelaId}` : ''}
-      GROUP BY be.estado
-    `;
+    const typeStatsParams = [];
+    if (startDate) typeStatsParams.push(startDate.toISOString());
+    if (endDate) typeStatsParams.push(endDate.toISOString());
     
-    // Calcular totales por escuela
-    const totalsBySchoolQuery = `
-      SELECT 
-        esc.nombre as escuela, 
-        COUNT(*) as total_beneficios, 
-        SUM(COALESCE(be.monto_total, 0)) as suma_total
-      FROM beneficios_economicos be
-      JOIN postulaciones p ON be.postulacion_id = p.id
-      JOIN ofertas o ON p.oferta_id = o.id
-      JOIN escuelas esc ON o.escuela_id = esc.id
-      WHERE 1=1
-      ${startDate ? ` AND be.fecha_creacion >= '${startDate}'` : ''}
-      ${endDate ? ` AND be.fecha_creacion <= '${endDate}'` : ''}
-      ${tipo ? ` AND be.tipo = '${tipo}'` : ''}
-      ${estado ? ` AND be.estado = '${estado}'` : ''}
-      GROUP BY esc.nombre
-      ORDER BY suma_total DESC
-    `;
-    
-    const [typeStats, statusStats, schoolStats] = await Promise.all([
-      pool.query(countByTypeQuery),
-      pool.query(countByStatusQuery),
-      pool.query(totalsBySchoolQuery)
-    ]);
-    
-    // Calcular totales generales
-    const totalAmount = result.rows.reduce((sum, item) => sum + (parseFloat(item.monto_total) || 0), 0);
+    const typeStats = await pool.query(countByTypeQuery, typeStatsParams);
     
     // Construir respuesta
     const report = {
       metadata: {
         generatedAt: new Date(),
         filters: {
-          startDate: startDate || 'No especificada',
-          endDate: endDate || 'No especificada',
-          tipo: tipo || 'Todos',
-          estado: estado || 'Todos',
-          escuela: escuelaId || 'Todas'
+          period: period || 'all',
+          startDate: startDate ? startDate.toISOString().split('T')[0] : null,
+          endDate: endDate ? endDate.toISOString().split('T')[0] : null,
         },
-        totalRecords: result.rows.length,
-        totalAmount: totalAmount
+        totalRecords: result.rows.length
       },
       statistics: {
-        byType: typeStats.rows,
-        byStatus: statusStats.rows,
-        bySchool: schoolStats.rows
+        byType: typeStats.rows
       },
       data: result.rows
     };
@@ -577,9 +513,49 @@ export const generateBenefitsReport = async (req: Request, res: Response): Promi
  */
 export const generateActivityReport = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Parámetros para filtrar el reporte
-    const startDate = req.query.start_date as string || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Último mes por defecto
-    const endDate = req.query.end_date as string || new Date().toISOString().split('T')[0]; // Hoy por defecto
+    // Obtener parámetros
+    const { period } = req.query;
+    let startDate, endDate;
+    console.log(period);
+    
+    // Si period es 'all' o no está definido, buscar en todo el historial
+    if (!period || period === 'all') {
+      // Buscar desde una fecha muy antigua para incluir todo
+      startDate = new Date('2000-01-01'); // Una fecha suficientemente antigua
+      endDate = new Date(); // Hasta hoy
+    } else {
+      // Aplicar filtros normales para otros períodos
+      switch(period) {
+        case 'week':
+          console.log('week');
+          startDate = new Date();
+          startDate.setDate(startDate.getDate() - 7);
+          endDate = new Date();
+          break;
+        case 'month':
+          console.log('month');
+          startDate = new Date();
+          startDate.setMonth(startDate.getMonth() - 1);
+          endDate = new Date();
+          break;
+        case 'semester':
+          console.log('semester');
+          startDate = new Date();
+          startDate.setMonth(startDate.getMonth() - 6);
+          endDate = new Date();
+          break;
+        case 'year':
+          console.log('year');
+          startDate = new Date();
+          startDate.setFullYear(startDate.getFullYear() - 1);
+          endDate = new Date();
+          break;
+        default:
+          console.log('default');
+          startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Último mes por defecto
+          endDate = new Date(); // Hoy por defecto
+      }
+    }
     
     // Estadísticas de nuevos usuarios por día
     const newUsersQuery = `
@@ -595,6 +571,7 @@ export const generateActivityReport = async (req: Request, res: Response): Promi
       GROUP BY DATE(fecha_creacion)
       ORDER BY fecha
     `;
+    console.log(newUsersQuery);
     
     // Estadísticas de nuevas ofertas por día
     const newOffersQuery = `
@@ -609,6 +586,7 @@ export const generateActivityReport = async (req: Request, res: Response): Promi
       GROUP BY DATE(fecha_creacion)
       ORDER BY fecha
     `;
+    console.log(newOffersQuery);
     
     // Estadísticas de nuevas postulaciones por día
     const newApplicationsQuery = `
@@ -624,7 +602,8 @@ export const generateActivityReport = async (req: Request, res: Response): Promi
       GROUP BY DATE(fecha_postulacion)
       ORDER BY fecha
     `;
-    
+    console.log(newApplicationsQuery);
+
     // Obtener estadísticas de accesos por hora del día
     const accessByHourQuery = `
       SELECT 
@@ -635,13 +614,14 @@ export const generateActivityReport = async (req: Request, res: Response): Promi
       GROUP BY hora
       ORDER BY hora
     `;
-    
+    console.log(accessByHourQuery);
+
     // Ejecutar consultas en paralelo
     const [newUsers, newOffers, newApplications, accessByHour] = await Promise.all([
-      pool.query(newUsersQuery, [startDate, endDate]),
-      pool.query(newOffersQuery, [startDate, endDate]),
-      pool.query(newApplicationsQuery, [startDate, endDate]),
-      pool.query(accessByHourQuery, [startDate, endDate])
+      pool.query(newUsersQuery, [startDate.toISOString(), endDate.toISOString()]),
+      pool.query(newOffersQuery, [startDate.toISOString(), endDate.toISOString()]),
+      pool.query(newApplicationsQuery, [startDate.toISOString(), endDate.toISOString()]),
+      pool.query(accessByHourQuery, [startDate.toISOString(), endDate.toISOString()])
     ]);
     
     // Construir respuesta
@@ -649,8 +629,8 @@ export const generateActivityReport = async (req: Request, res: Response): Promi
       metadata: {
         generatedAt: new Date(),
         period: {
-          startDate,
-          endDate
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0]
         }
       },
       dailyActivity: {
@@ -667,7 +647,9 @@ export const generateActivityReport = async (req: Request, res: Response): Promi
         totalNewApplications: newApplications.rows.reduce((sum, day) => sum + parseInt(day.total_postulaciones), 0)
       }
     };
+    console.log(report);
     
+
     res.status(200).json({
       success: true,
       data: report,

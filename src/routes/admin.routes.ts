@@ -5,6 +5,7 @@ import * as dashboardController from '../controllers/admin/dashboard.controller'
 import * as userController from '../controllers/admin/user.controller';
 import * as contentController from '../controllers/admin/content.controller';
 import * as reportsController from '../controllers/admin/reports.controller';
+import * as profileController from '../controllers/admin/profile.controller';
 
 const router = Router();
 
@@ -36,5 +37,10 @@ router.get('/reports/offers', (reportsController.generateOffersReport as unknown
 router.get('/reports/applications', (reportsController.generateApplicationsReport as unknown) as RequestHandler);
 router.get('/reports/benefits', (reportsController.generateBenefitsReport as unknown) as RequestHandler);
 router.get('/reports/activity', (reportsController.generateActivityReport as unknown) as RequestHandler);
+
+// Rutas para el Perfil
+router.get('/profile', (profileController.getProfile as unknown) as RequestHandler);
+router.post('/profile', (profileController.updateProfile as unknown) as RequestHandler);
+router.post('/profile/change-password', (profileController.changePassword as unknown) as RequestHandler);
 
 export default router;
