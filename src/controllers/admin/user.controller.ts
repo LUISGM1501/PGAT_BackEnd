@@ -170,7 +170,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
     const { nombre, correo, password, tipo, ...profileData } = req.body;
     
     // Validar correo institucional
-    const emailRegex = /@(estudiante\.tec\.ac\.cr|itcr\.ac\.cr)$/;
+    const emailRegex = /@(estudiantec\.cr|itcr\.ac\.cr)$/;
     if (!emailRegex.test(correo)) {
       res.status(400).json({
         success: false,
@@ -262,8 +262,10 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
 export const updateUser = async (req: Request, res: Response) => {
   try {
     const userId = parseInt(req.params.id);
+    console.log('ID de usuario recibido:', userId);
     
     if (isNaN(userId)) {
+      console.log('ID de usuario inválido');
       return res.status(400).json({
         success: false,
         message: 'ID de usuario inválido'
@@ -271,10 +273,13 @@ export const updateUser = async (req: Request, res: Response) => {
     }
     
     const { nombre, estado, password, ...profileData } = req.body;
+    console.log('Datos recibidos para actualizar:', req.body);
     
     // Verificar si el usuario existe
     const existingUser = await UsuarioModel.findById(userId);
+    console.log('Usuario existente:', existingUser);
     if (!existingUser) {
+      console.log('Usuario no encontrado');
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
@@ -293,8 +298,11 @@ export const updateUser = async (req: Request, res: Response) => {
       updateData.password = await bcrypt.hash(password, salt);
     }
     
+    console.log('Datos preparados para actualizar:', updateData);
+    
     // Actualizar usuario base
     const updatedUser = await UsuarioModel.update(userId, updateData);
+    console.log('Usuario actualizado:', updatedUser);
     
     // Actualizar perfil específico según tipo
     let specificProfile = null;
@@ -302,8 +310,10 @@ export const updateUser = async (req: Request, res: Response) => {
     switch (existingUser.tipo) {
       case 'estudiante': {
         const estudiante = await EstudianteModel.findByUsuarioId(userId);
+        console.log('Perfil de estudiante encontrado:', estudiante);
         if (estudiante && Object.keys(profileData).length > 0) {
           specificProfile = await EstudianteModel.update(estudiante.id as number, profileData);
+          console.log('Perfil de estudiante actualizado:', specificProfile);
         }
         break;
       }
@@ -312,8 +322,10 @@ export const updateUser = async (req: Request, res: Response) => {
           'SELECT * FROM profesores WHERE usuario_id = $1',
           [userId]
         );
+        console.log('Perfil de profesor encontrado:', profesor.rows);
         if (profesor.rows.length > 0 && Object.keys(profileData).length > 0) {
           specificProfile = await ProfesorModel.update(profesor.rows[0].id, profileData);
+          console.log('Perfil de profesor actualizado:', specificProfile);
         }
         break;
       }
@@ -322,8 +334,10 @@ export const updateUser = async (req: Request, res: Response) => {
           'SELECT * FROM escuelas WHERE usuario_id = $1',
           [userId]
         );
+        console.log('Perfil de escuela encontrado:', escuela.rows);
         if (escuela.rows.length > 0 && Object.keys(profileData).length > 0) {
           specificProfile = await EscuelaModel.update(escuela.rows[0].id, profileData);
+          console.log('Perfil de escuela actualizado:', specificProfile);
         }
         break;
       }

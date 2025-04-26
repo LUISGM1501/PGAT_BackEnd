@@ -1,3 +1,4 @@
+// src/routes/admin.routes.ts
 import { Router, RequestHandler } from 'express';
 import { isAdmin } from '../middleware/role.middleware';
 import * as dashboardController from '../controllers/admin/dashboard.controller';

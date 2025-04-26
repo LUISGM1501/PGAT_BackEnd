@@ -93,7 +93,7 @@ PORT=3000
 NODE_ENV=development
 
 # Configuración de la base de datos
-DB_HOST=pgat-postgres
+DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=pgat_tec_db
 DB_USER=postgres
